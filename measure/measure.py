@@ -1,12 +1,13 @@
-from typing import Dict, Mapping, Tuple, Union, List, Any, Callable, FrozenSet
+from typing import Dict, Mapping, Tuple, Union, List, Any, Callable, FrozenSet, Type, Iterable
 from abc import abstractmethod, ABC
 
 from numbers import Real
 from collections import Counter
 import re
 import itertools as it
+import operator as op
 
-from ._util import FalseWrapper, split_amount_args
+from ._util import FalseWrapper, split_amount_args, minimal_class, combine_maps
 
 
 # todo custom amount type
@@ -51,19 +52,6 @@ class Unit(ABC):
 
 
 Unit.register(Real)
-
-
-def _combine_maps(func: Callable[..., int], *maps: Mapping[Any, int], default=0) -> Counter:
-    keys = it.chain(*(m.keys() for m in maps))
-    ret = Counter()
-    for k in keys:
-        if k in ret:
-            continue
-        args = (m.get(k, default) for m in maps)
-        v = func(*args)
-        if v != default:
-            ret[k] = v
-    return ret
 
 
 class Measure(ABC):
@@ -115,14 +103,24 @@ class Measure(ABC):
         """
         pass
 
+    @staticmethod
+    def __lowest_common_derived_type__(primitives: Iterable['Measure']) -> Type['Measure']:
+        return minimal_class((m.__derived_type__() for m in primitives), default=DerivedMeasure)
+
+    @staticmethod
+    def __derived_type__():
+        # todo doc
+        return DerivedMeasure
+
     def __mul__(self, other: 'Measure'):
         """
         Multiply the measure by another measure
         :param other: another measure
         :return: a compound measure combining the primitives for both measures
         """
-        primitives = _combine_maps(lambda x, y: x + y, self.__primitives__(), other.__primitives__())
-        return DerivedMeasure(primitives)
+        primitives = combine_maps(op.add, self.__primitives__(), other.__primitives__())
+        dir_type = Measure.__lowest_common_derived_type__(primitives)
+        return dir_type(primitives)
 
     def __truediv__(self, other: 'Measure'):
         """
@@ -130,8 +128,9 @@ class Measure(ABC):
         :param other: another measure
         :return: a compound measure combining the primitives for both measures
         """
-        primitives = _combine_maps(lambda x, y: x - y, self.__primitives__(), other.__primitives__())
-        return DerivedMeasure(primitives)
+        primitives = combine_maps(op.sub, self.__primitives__(), other.__primitives__())
+        dir_type = Measure.__lowest_common_derived_type__(primitives)
+        return dir_type(primitives)
 
     def __pow__(self, power: Union[int, Real]):
         """
@@ -141,8 +140,8 @@ class Measure(ABC):
         """
         if power not in [0, 1, -1] and (1 / power) % 1 == 0:
             return self.root(int(1 / power))
-        primitives = _combine_maps(lambda x: x * power, self.__primitives__())
-        return DerivedMeasure(primitives)
+        primitives = combine_maps(lambda x: x * power, self.__primitives__())
+        return self.__derived_type__()(primitives)
 
     def __call__(self, unit: Union[str, Real], amount: Union[str, Real] = 1) -> 'Measurement':
         """
@@ -252,6 +251,9 @@ class ScalarMeasure(Measure, int):
         :return: self
         """
         return self
+
+    def __derived_type__(self):
+        return object
 
 
 class MutableMeasure(Measure):
@@ -399,30 +401,37 @@ class DerivedMeasure(MutableMeasure):
         if called directly, __contains__ returns an assignemt dictionary, mapping each part of the measure to a
         valid unit, or a FalseWrapper, wrapping an exception if matching failed.
         """
-        if item in self._aliases:
-            f, a = self._aliases[item]
-            return a in self
-        match = self.composite_measurement_pattern.fullmatch(item)
-        if not match:
-            return FalseWrapper(ValueError(f'could not parse string {item!r}'))
-        pos, neg = match.group('pos'), match.group('neg')
+
         assigned = []
         left = dict(self._parts)
-        try:
-            self._assign_measurements(pos, 1, assigned, left)
-            self._assign_measurements(neg, -1, assigned, left)
-        except KeyError as e:
-            return FalseWrapper(e)
+
+        if isinstance(item, str):
+            if item in self._aliases:
+                a = self._aliases[item]
+                if not isinstance(a, str):
+                    _, a = a
+                return a in self
+
+            match = self.composite_measurement_pattern.fullmatch(item)
+            if not match:
+                return FalseWrapper(ValueError(f'could not parse string {item!r}'))
+            pos, neg = match.group('pos'), match.group('neg')
+            try:
+                self._assign_measurements_str(pos, 1, assigned, left)
+                self._assign_measurements_str(neg, -1, assigned, left)
+            except KeyError as e:
+                return FalseWrapper(e)
+        elif isinstance(item, Mapping):
+            self._assign_measurements_map(item, assigned, left)
 
         for p, n in left.items():
-            if n > 0:
+            if n != 0:
                 return FalseWrapper(KeyError(f'unit {p} unassigned'))
-
         return assigned
 
     @classmethod
-    def _assign_measurements(cls, part: str, factor: int, assigned: List[Tuple[BasicMeasure, int, str]],
-                             left: Dict[BasicMeasure, int]):
+    def _assign_measurements_str(cls, part: str, factor: int, assigned: List[Tuple[BasicMeasure, int, str]],
+                                 left: Dict[BasicMeasure, int]):
         if part is None or part == '1':
             return
         matches = cls.measurement_pattern.finditer(part)
@@ -440,22 +449,37 @@ class DerivedMeasure(MutableMeasure):
             else:
                 raise KeyError(name)
 
+    @classmethod
+    def _assign_measurements_map(cls, part: Mapping[str,int], assigned: List[Tuple[BasicMeasure, int, str]],
+                                 left: Dict[BasicMeasure, int]):
+        for (name, num) in part.items():
+            for p in (k for (k, n) in left.items() if n >= num):
+                if name in p:
+                    assigned.append((p, num, name))
+                    left[p] -= num
+                    assert left[p] >= 0
+                    break
+            else:
+                raise KeyError(name)
+
     def __getitem__(self, item):
         if isinstance(item, Measurement):
             if item.measure != self:
                 raise ValueError(f'cannot accept measurement of unit {item}')
             return item.amount
-        a, i = split_amount_args(item, default_amount=None)
-        if a is not None:
-            return a * self[i]
+        if isinstance(item, str):
+            a, i = split_amount_args(item, default_amount=None)
+            if a is not None:
+                return a * self[i]
 
-        if item in self._aliases:
-            a = self._aliases[item]
-            if isinstance(a, str):
-                f = 1
-            else:
-                f, a = a
-            return f * self[a]
+            if item in self._aliases:
+                a = self._aliases[item]
+                if isinstance(a, str):
+                    f = 1
+                else:
+                    f, a = a
+                return f * self[a]
+
         assigned = self.__contains__(item)
 
         if not assigned:
@@ -511,8 +535,11 @@ class DerivedMeasure(MutableMeasure):
     def root(self, r: int):
         if not all(n % r == 0 for n in self._parts.values()):
             raise ValueError(f'cannot get the {r} root of {self}')
-        primitives = _combine_maps(lambda x: x / r, self.__primitives__())
+        primitives = combine_maps(lambda x: x / r, self.__primitives__())
         return DerivedMeasure(primitives)
+
+    def __derived_type__(self):
+        return None
 
 
 class Measurement:
@@ -578,9 +605,6 @@ class Measurement:
             return type(self)(amount, measure)
         return NotImplemented
 
-    def __rmul__(self, other: Real):
-        return self * other
-
     def __rtruediv__(self, other: Real):
         """
         invert the measure
@@ -588,12 +612,6 @@ class Measurement:
         :return: other / self
         """
         return type(self)(other / self.amount, ~self.measure)
-
-    def __invert__(self):
-        """
-        invert the measure
-        """
-        return 1 / self
 
     def __pow__(self, power: int):
         """
@@ -625,18 +643,6 @@ class Measurement:
             return NotImplemented
         return type(self)(self.amount - other.amount, self.measure)
 
-    def __rsub__(self, other):
-        return -(self - other)
-
-    def __radd__(self, other):
-        return self + other
-
-    def __eq__(self, other: Union['Measurement', int]):
-        other = self._coalesce(other, check_measure=False)
-        if not other:
-            return NotImplemented
-        return self.measure == other.measure and self.amount == other.amount
-
     def __round__(self, measurement: Union[str, 'Measurement']):
         """
         Round a measurement to the nearest unit of the measure
@@ -649,6 +655,27 @@ class Measurement:
         amount = measurement.amount
         amount = amount * round(self.amount / amount)
         return type(self)(amount, self.measure)
+
+    def __rmul__(self, other: Real):
+        return self * other
+
+    def __invert__(self):
+        """
+        invert the measure
+        """
+        return 1 / self
+
+    def __rsub__(self, other):
+        return -(self - other)
+
+    def __radd__(self, other):
+        return self + other
+
+    def __eq__(self, other: Union['Measurement', int]):
+        other = self._coalesce(other, check_measure=False)
+        if not other:
+            return NotImplemented
+        return self.measure == other.measure and self.amount == other.amount
 
     def __hash__(self):
         return hash((self.measure, self.amount))

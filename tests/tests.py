@@ -83,6 +83,10 @@ class GeneralTests(unittest.TestCase):
         s = format(a, '.2e:10 m/s2|g')
         self.assertEqual(s, '1.27e-01 g')
 
+    def test_access_map(self):
+        acc = Distance / Time ** 2
+        self.assertEqual(acc[{'km': 1, 's': -2}], 1e3)
+
 
 class LinearTests(unittest.TestCase):
     def test_simple(self):
@@ -117,6 +121,7 @@ class AggregateTests(unittest.TestCase):
         jerry += 2 * Distance.foot
         self.assertLess(jerry, tom)
 
+
 class DynamicTests(unittest.TestCase):
     def test_simple(self):
         Currency = DynamicMeasure('currency')
@@ -133,3 +138,17 @@ class DynamicTests(unittest.TestCase):
 
         self.assertEqual(pogs['gold'], 1.5)
         self.assertEqual(pogs['toy'], 0.15)
+
+    def test_derived(self):
+        Currency = DynamicMeasure('currency')
+        Currency['gold'] = 1
+        Currency['toy'] = 0.01
+        Currency['pog'] = 2
+
+        cost_of_fence = 3 * Currency.toy / Distance.m
+        self.assertEqual((cost_of_fence * Distance.km)['gold'], 30)
+        Currency['toy'] = 10
+        self.assertEqual((cost_of_fence * Distance.km)['gold'], 30_000)
+
+    def test_aggregate(self):
+        self.fail()
