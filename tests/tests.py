@@ -151,4 +151,95 @@ class DynamicTests(unittest.TestCase):
         self.assertEqual((cost_of_fence * Distance.km)['gold'], 30_000)
 
     def test_aggregate(self):
-        self.fail()
+        Currency = DynamicMeasure('currency')
+        Currency['gold'] = 1
+        Currency['toy'] = 0.01
+        Currency['pog'] = 2
+
+        CurAgg = Currency.aggregate()
+
+        bunch_pogs = CurAgg('100 pog')
+        self.assertEqual(bunch_pogs['gold'], 200)
+        bunch_pogs += Currency.pog * 50
+        Currency['pog'] = 0.5
+        self.assertEqual(bunch_pogs['gold'], 75)
+
+    def test_cmp(self):
+        Currency = DynamicMeasure('currency')
+        Currency['gold'] = 1
+        Currency['toy'] = 0.01
+        Currency['pog'] = 2
+
+        bunch_toys = Currency('100 toy')
+        pog = Currency.pog
+
+        self.assertLess(bunch_toys, pog)
+
+        Currency['pog'] = 1
+
+        self.assertEqual(bunch_toys, pog)
+
+        self.assertGreater(pog, 0)
+
+    def test_cmp_agg(self):
+        Currency = DynamicMeasure('currency')
+        Currency['gold'] = 1
+        Currency['toy'] = 0.01
+        Currency['pog'] = 2
+
+        CurAgg = Currency.aggregate()
+
+        bunch_toys = CurAgg('100 toy')
+        pog = CurAgg('1 pog')
+
+        self.assertLess(bunch_toys, pog)
+
+        Currency['pog'] = 1
+
+        self.assertEqual(bunch_toys, pog)
+
+        self.assertGreater(pog, 0)
+
+    def test_add(self):
+        Currency = DynamicMeasure('currency')
+        Currency['gold'] = 1
+        Currency['toy'] = 0.01
+        Currency['pog'] = 2
+
+        bunch_toys = Currency('100 toy')
+        bunch_toys += '50 toy'
+
+        self.assertEqual(bunch_toys['gold'], 1.5)
+
+        Currency['toy'] = 1.5
+
+        self.assertEqual(bunch_toys['gold'], 225)
+
+        with self.assertRaises(TypeError):
+            bunch_toys += '5 gold'
+
+    def test_conv(self):
+        Currency = DynamicMeasure('currency')
+        Currency['gold'] = 1
+        Currency['toy'] = 0.01
+        Currency['pog'] = 2
+
+        bunch_toys = Currency('100 toy')
+
+        as_pog = bunch_toys('pog')
+        self.assertEqual(as_pog.unit, 'pog')
+        self.assertEqual(as_pog, bunch_toys)
+
+    def test_conv_agg(self):
+        Currency = DynamicMeasure('currency')
+        Currency['gold'] = 1
+        Currency['toy'] = 0.01
+        Currency['pog'] = 2
+        CurrAgg = Currency.aggregate()
+
+        bunch_toys = CurrAgg('100 toy')
+
+        as_pog = bunch_toys('pog')
+        self.assertEqual(as_pog.unit, 'pog')
+        self.assertEqual(as_pog, bunch_toys)
+

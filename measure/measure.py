@@ -9,7 +9,6 @@ import operator as op
 
 from ._util import FalseWrapper, split_amount_args, minimal_class, combine_maps
 
-
 # todo custom amount type
 
 class Unit(ABC):
@@ -109,7 +108,9 @@ class Measure(ABC):
 
     @staticmethod
     def __derived_type__():
-        # todo doc
+        """
+        get the type of derived measures that result from multiplying or dividing this measure
+        """
         return DerivedMeasure
 
     def __mul__(self, other: 'Measure'):
@@ -450,7 +451,7 @@ class DerivedMeasure(MutableMeasure):
                 raise KeyError(name)
 
     @classmethod
-    def _assign_measurements_map(cls, part: Mapping[str,int], assigned: List[Tuple[BasicMeasure, int, str]],
+    def _assign_measurements_map(cls, part: Mapping[str, int], assigned: List[Tuple[BasicMeasure, int, str]],
                                  left: Dict[BasicMeasure, int]):
         for (name, num) in part.items():
             for p in (k for (k, n) in left.items() if n >= num):
@@ -856,9 +857,6 @@ class AggregateMeasurement:
         arb = self.amount + other.amount
         return type(self)(arb, self.measure)
 
-    def __radd__(self, other: Measurement):
-        return self + other
-
     def __sub__(self, other_orig: Union[Measurement, 'AggregateMeasurement']):
         other = self._coalesce_to_delta(other_orig)
         if other:
@@ -871,13 +869,6 @@ class AggregateMeasurement:
             return self.measure.derivative()(None, arb)
         return NotImplemented
 
-    def __eq__(self, other):
-        other = self._coalesce_to_absolute(other)
-        return other and other.owner == self.measure and other.amount == self.amount
-
-    def __hash__(self):
-        return hash((self.measure, self.amount))
-
     def __round__(self, measurement):
         measurement = self._coalesce_to_delta(measurement)
         if not measurement:
@@ -885,6 +876,16 @@ class AggregateMeasurement:
         amount = measurement.amount
         amount = amount * round(self.amount / amount)
         return type(self)(amount, self.measure)
+
+    def __eq__(self, other):
+        other = self._coalesce_to_absolute(other)
+        return other and other.owner == self.measure and other.amount == self.amount
+
+    def __radd__(self, other: Measurement):
+        return self + other
+
+    def __hash__(self):
+        return hash((self.measure, self.amount))
 
     def __lt__(self, other):
         other = self._coalesce_to_absolute(other)
@@ -937,4 +938,6 @@ class BasicAggregateMeasure(AggregateMeasure):
 
     def derivative(self):
         return self._derivative
-    # todo str
+
+    def __str__(self):
+        return f'aggregate of {self.derivative()}'
