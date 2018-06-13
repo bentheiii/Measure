@@ -116,3 +116,20 @@ class AggregateTests(unittest.TestCase):
         jerry = Position('-6 m')
         jerry += 2 * Distance.foot
         self.assertLess(jerry, tom)
+
+class DynamicTests(unittest.TestCase):
+    def test_simple(self):
+        Currency = DynamicMeasure('currency')
+        Currency['gold'] = 1
+        Currency['toy'] = 0.01
+        Currency['pog'] = 2
+
+        pogs = Currency('3 pog')
+        self.assertEqual(pogs['gold'], 6)
+        self.assertEqual(pogs['toy'], 600)
+
+        Currency['toy'] = 10
+        Currency['pog'] = 0.5
+
+        self.assertEqual(pogs['gold'], 1.5)
+        self.assertEqual(pogs['toy'], 0.15)

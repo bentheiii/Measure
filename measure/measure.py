@@ -910,3 +910,4 @@ class BasicAggregateMeasure(AggregateMeasure):
 
     def derivative(self):
         return self._derivative
+    # todo str
