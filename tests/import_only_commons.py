@@ -1,3 +1,3 @@
 from measure.commons import *
 
-print(Distance.m / Time.s**2)
+print(Distance.m / Duration.s ** 2)

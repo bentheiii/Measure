@@ -16,12 +16,12 @@ Distance.update({
 })
 Distance.optimize_aliases()
 
-Time = BasicMeasure('time', second=1, minute=60, hour='60 minute', millisecond=0.001, day='24 hour')
-Time.update({
+Duration = BasicMeasure('duration', second=1, minute=60, hour='60 minute', millisecond=0.001, day='24 hour')
+Duration.update({
     's': 'second',
     'ms': 'millisecond'
 })
-Time.optimize_aliases()
+Duration.optimize_aliases()
 
 Mass = BasicMeasure('mass', kilogram=1, ton=1000, pound=0.4536, gram=0.001)
 Mass.update({
@@ -43,4 +43,4 @@ Temperature['C'] = Temperature['celsius'] = Ladder.from_points((-273.15, 0), (0,
 Temperature['F'] = Temperature['fahrenheit'] = Ladder.from_points((-459.67, -40), (0, 233.15))
 Temperature.optimize_aliases()
 
-__all__ = 'Distance', 'Time', 'Mass', 'Angle', 'Temperature'
+__all__ = 'Distance', 'Duration', 'Mass', 'Angle', 'Temperature'

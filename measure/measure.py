@@ -1,4 +1,4 @@
-from typing import Dict, Mapping, Tuple, Union, List, Any, Callable, FrozenSet, Type, Iterable
+from typing import Dict, Mapping, Tuple, Union, List, FrozenSet, Type, Iterable
 from abc import abstractmethod, ABC
 
 from numbers import Real
@@ -8,6 +8,7 @@ import itertools as it
 import operator as op
 
 from ._util import FalseWrapper, split_amount_args, minimal_class, combine_maps
+
 
 # todo custom amount type
 

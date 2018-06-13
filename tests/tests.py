@@ -16,15 +16,15 @@ class PrimitiveUnitsTests(unittest.TestCase):
 
 class GeneralTests(unittest.TestCase):
     def test_div(self):
-        Speed = Distance / Time
+        Speed = Distance / Duration
 
-        Acceleration = Speed / Time
+        Acceleration = Speed / Duration
 
-        self.assertIs(Acceleration, Distance / Time ** 2)
+        self.assertIs(Acceleration, Distance / Duration ** 2)
 
         g = Acceleration('meter/second2', 9.8)
 
-        self.assertAlmostEqual(Speed(0.98, 'meter/second') / Time(0.1, 'second'), g, delta='0.0001 m/s^2')
+        self.assertAlmostEqual(Speed(0.98, 'meter/second') / Duration(0.1, 'second'), g, delta='0.0001 m/s^2')
 
     def test_pow(self):
         sq_km = (Distance ** 2)('kilometer**2')
@@ -32,26 +32,26 @@ class GeneralTests(unittest.TestCase):
         self.assertEqual(km ** 2, sq_km)
 
     def test_inv(self):
-        Frequency = 1 / Time
+        Frequency = 1 / Duration
 
         Frequency['hz'] = '1/second'
         self.assertAlmostEqual(Frequency['hz'] / Frequency['1/minute'], 60)
 
     def test_mul(self):
-        Speed = Distance / Time
+        Speed = Distance / Duration
 
-        Acceleration = Speed / Time
+        Acceleration = Speed / Duration
 
         Force = Mass * Acceleration
 
-        Energy = Mass * Distance ** 2 / Time ** 2
+        Energy = Mass * Distance ** 2 / Duration ** 2
 
         self.assertEqual(Energy, Force * Distance)
 
     def test_loki(self):
         loki_mass = Mass(525, 'lb')
 
-        g = 9.8 * Distance.m / Time.s ** 2
+        g = 9.8 * Distance.m / Duration.s ** 2
 
         human_area = 1 * Distance.m ** 2
         human_height = 167 * Distance.cm
@@ -63,19 +63,19 @@ class GeneralTests(unittest.TestCase):
                 (1.23 * Mass.kg / Distance.meter ** 3) * loki_area)) ** .5
 
         time_to_reach_tv = terminal_velocity / g
-        if 30 * Time.minute > time_to_reach_tv:
+        if 30 * Duration.minute > time_to_reach_tv:
             loki_momentum = loki_mass * terminal_velocity
         else:
-            loki_momentum = 30 * Time.minute * g * loki_mass
+            loki_momentum = 30 * Duration.minute * g * loki_mass
         self.assertAlmostEqual(loki_momentum, '12690 kg*m/s', delta='1 kg*m/s')
 
     def test_ratio(self):
-        speed_of_sound = 340 * Distance.m / Time.s
-        speed_of_light = 299_792 * Distance.km / Time.s
+        speed_of_sound = 340 * Distance.m / Duration.s
+        speed_of_light = 299_792 * Distance.km / Duration.s
         self.assertAlmostEqual(speed_of_light / speed_of_sound, 881_741, delta=1)
 
     def test_format(self):
-        a = 1.27 * Distance.m / Time.s ** 2
+        a = 1.27 * Distance.m / Duration.s ** 2
         s = format(a, '.2f:m/s2')
         self.assertEqual(s, '1.27 m/s2')
         s = format(a, '10 m/s2|g')
@@ -84,7 +84,7 @@ class GeneralTests(unittest.TestCase):
         self.assertEqual(s, '1.27e-01 g')
 
     def test_access_map(self):
-        acc = Distance / Time ** 2
+        acc = Distance / Duration ** 2
         self.assertEqual(acc[{'km': 1, 's': -2}], 1e3)
 
 
